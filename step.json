@@ -1,0 +1,68 @@
+{
+  "Comment": "An Alm bulk upload State Function",
+  "StartAt": "StartWorkflowRun",
+  "States": {
+    "StartWorkflowRun": {
+      "Type": "Task",
+      "Parameters": {
+        "Name": "alm-workflow"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:glue:startWorkflowRun",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "*"
+          ],
+          "Next": "CopyObject (1)"
+        }
+      ],
+      "Next": "ListObjects"
+    },
+    "ListObjects": {
+      "Type": "Task",
+      "Next": "CopyObject",
+      "Parameters": {
+        "Bucket": "alm-read-bucket"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:listObjects"
+    },
+    "CopyObject (1)": {
+      "Type": "Task",
+      "Parameters": {
+        "Bucket": "alm-unprocess-bucket",
+        "CopySource.$": "States.Format('/alm-read-bucket/{}', $.Contents[0].Key)",
+        "Key": "/completed/"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:copyObject",
+      "Next": "DeleteReadFolderObject (1)"
+    },
+    "DeleteReadFolderObject (1)": {
+      "Type": "Task",
+      "Parameters": {
+        "Bucket": "alm-read-bucket",
+        "Key.$": "$.Contents[0].Key"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+      "End": true
+    },
+    "CopyObject": {
+      "Type": "Task",
+      "Next": "DeleteReadFolderObject",
+      "Parameters": {
+        "Bucket": "alm-complete-bucket",
+        "CopySource.$": "States.Format('/alm-read-bucket/{}', $.Contents[0].Key)",
+        "Key.$": "$.Contents[0].Key"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:copyObject"
+    },
+    "DeleteReadFolderObject": {
+      "Type": "Task",
+      "Parameters": {
+        "Bucket": "alm-read-bucket",
+        "Key.$": "$.Contents[0].Key"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
+      "End": true
+    }
+  }
+}
