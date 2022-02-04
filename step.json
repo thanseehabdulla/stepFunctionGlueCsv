@@ -13,53 +13,63 @@
           "ErrorEquals": [
             "*"
           ],
-          "Next": "CopyObject (1)"
+          "Next": "ListObjectInReadS3AfterFailure"
         }
       ],
-      "Next": "ListObjects"
+      "Next": "ListObjectsFromReadAfterSuccess"
     },
-    "ListObjects": {
+    "ListObjectInReadS3AfterFailure": {
       "Type": "Task",
-      "Next": "CopyObject",
+      "Next": "CopyObjectToUnprocessed",
       "Parameters": {
         "Bucket": "alm-read-bucket"
       },
       "Resource": "arn:aws:states:::aws-sdk:s3:listObjects"
     },
-    "CopyObject (1)": {
+    "ListObjectsFromReadAfterSuccess": {
+      "Type": "Task",
+      "Next": "CopyObjectToComplete",
+      "Parameters": {
+        "Bucket": "alm-read-bucket"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:listObjects"
+    },
+    "CopyObjectToUnprocessed": {
       "Type": "Task",
       "Parameters": {
-        "Bucket": "alm-unprocess-bucket",
+        "Bucket": "alm-unprocessed-bucket",
         "CopySource.$": "States.Format('/alm-read-bucket/{}', $.Contents[0].Key)",
-        "Key": "/completed/"
+        "Key.$": "$.Contents[0].Key"
       },
       "Resource": "arn:aws:states:::aws-sdk:s3:copyObject",
-      "Next": "DeleteReadFolderObject (1)"
+      "Next": "DeleteReadObjectAfterUnprocessed",
+      "OutputPath": "$.InputPrev"
     },
-    "DeleteReadFolderObject (1)": {
+    "DeleteReadObjectAfterUnprocessed": {
       "Type": "Task",
       "Parameters": {
         "Bucket": "alm-read-bucket",
-        "Key.$": "$.Contents[0].Key"
+        "Key.$": "$.input.Contents[0].Key"
       },
       "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
       "End": true
     },
-    "CopyObject": {
+    "CopyObjectToComplete": {
       "Type": "Task",
-      "Next": "DeleteReadFolderObject",
+      "Next": "DeleteReadObjectAfterComplete",
       "Parameters": {
         "Bucket": "alm-complete-bucket",
         "CopySource.$": "States.Format('/alm-read-bucket/{}', $.Contents[0].Key)",
         "Key.$": "$.Contents[0].Key"
       },
-      "Resource": "arn:aws:states:::aws-sdk:s3:copyObject"
+      "Resource": "arn:aws:states:::aws-sdk:s3:copyObject",
+      "ResultPath": "$.InputPrev"
     },
-    "DeleteReadFolderObject": {
+    "DeleteReadObjectAfterComplete": {
       "Type": "Task",
       "Parameters": {
         "Bucket": "alm-read-bucket",
-        "Key.$": "$.Contents[0].Key"
+        "Key.$": "$.input.Contents[0].Key"
       },
       "Resource": "arn:aws:states:::aws-sdk:s3:deleteObject",
       "End": true
